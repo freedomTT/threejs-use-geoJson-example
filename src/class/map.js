@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import "../lib/three/js/controls/OrbitControls"
 import axios from 'axios'
+import * as d3 from 'd3-geo'
 
 export default class GeoMap {
     constructor() {
@@ -24,13 +25,46 @@ export default class GeoMap {
     }
 
     /**
-     * @desc 绘制地图
+     * @desc 获取地图
      * */
 
     getMap() {
+        let that = this;
         axios.get('/geojson/100000.json').then(function (res) {
-            console.log(res)
+            if (res.status === 200) {
+                const data = res.data;
+                that.drawMap(data)
+            }
         })
+    }
+
+    /**
+     * @desc 绘制地图
+     * */
+
+    drawMap(data) {
+        let that = this;
+        data.features.forEach(function (area) {
+            area.geometry.coordinates.forEach(function (block) {
+                block.forEach(function (cd) {
+                    let a = that.lnglatToVoctor(cd)
+                })
+            })
+        })
+    }
+
+
+    /**
+     * @desc 坐标转墨卡托投影
+     * */
+
+    lnglatToVoctor(lnglat) {
+        if (!this.projection) {
+            this.projection = d3.geoMercator().center([104.072403, 30.663341]).scale(80);
+        }
+        const [x, y] = this.projection([lnglat[0].toFixed(4),lnglat[1].toFixed(4)]);
+        console.log(x, y)
+        return [x, y, 2]
     }
 
     /**
