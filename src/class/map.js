@@ -44,27 +44,38 @@ export default class GeoMap {
 
     drawMap(data) {
         let that = this;
-        data.features.forEach(function (area) {
-            area.geometry.coordinates.forEach(function (block) {
-                block.forEach(function (cd) {
-                    let a = that.lnglatToVoctor(cd)
+
+
+        let group = new THREE.Group();
+        group.position.y = 0;
+        this.scene.add(group);
+        var californiaPts = [];
+
+
+        // let shape = [];
+        data.features.forEach(function (area, i) {
+            if (i === 0) {
+                area.geometry.coordinates.forEach(function (block, index) {
+                    if (index === 0) {
+                        block.forEach(function (cd, l) {
+                            californiaPts.push(new THREE.Vector2(cd[0].toFixed(2), cd[1].toFixed(2)))
+                            if (l === block.length) {
+                                californiaPts.push(new THREE.Vector2(block[0][0].toFixed(2), block[0][1].toFixed(2)))
+                            }
+                        })
+                    }
                 })
-            })
+            }
         })
-    }
+        console.log(californiaPts)
+        for (var i = 0; i < californiaPts.length; i++) californiaPts[i].multiplyScalar(0.000001);
+        var californiaShape = new THREE.Shape(californiaPts);
 
-
-    /**
-     * @desc 坐标转墨卡托投影
-     * */
-
-    lnglatToVoctor(lnglat) {
-        if (!this.projection) {
-            this.projection = d3.geoMercator().center([104.072403, 30.663341]).scale(80);
-        }
-        const [x, y] = this.projection([lnglat[0].toFixed(4),lnglat[1].toFixed(4)]);
-        console.log(x, y)
-        return [x, y, 2]
+        var geometry = new THREE.ShapeBufferGeometry(californiaShape);
+        var mesh = new THREE.Mesh(geometry, new THREE.MeshPhongMaterial({side: THREE.DoubleSide}));
+        mesh.position.set(0, 0, 0);
+        mesh.rotation.set(0, 0, 0);
+        group.add(mesh);
     }
 
     /**
@@ -95,6 +106,8 @@ export default class GeoMap {
         this.camera.lookAt(0, 0, 0);
         this.scene.add(this.camera);
         // this.setCameraHelper();
+        var light = new THREE.PointLight(0xffffff, 0.8);
+        this.camera.add(light);
     }
 
     /**
