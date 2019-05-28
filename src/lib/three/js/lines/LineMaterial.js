@@ -11,7 +11,7 @@
  *  resolution: <Vector2>, // to be set by renderer
  * }
  */
-
+import * as THREE from 'three'
 THREE.UniformsLib.line = {
 
 	linewidth: { value: 1 },

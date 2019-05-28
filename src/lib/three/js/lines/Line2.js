@@ -2,7 +2,7 @@
  * @author WestLangley / http://github.com/WestLangley
  *
  */
-
+import * as THREE from 'three'
 THREE.Line2 = function ( geometry, material ) {
 
 	THREE.LineSegments2.call( this );

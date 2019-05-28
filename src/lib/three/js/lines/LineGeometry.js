@@ -2,7 +2,7 @@
  * @author WestLangley / http://github.com/WestLangley
  *
  */
-
+import * as THREE from 'three'
 THREE.LineGeometry = function () {
 
 	THREE.LineSegmentsGeometry.call( this );
