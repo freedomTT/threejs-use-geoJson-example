@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import '../lib/three/js/controls/OrbitControls'
 import axios from 'axios'
 import * as d3 from 'd3-geo'
+import TWEEN from '@tweenjs/tween.js'
 
 export default class GeoMap {
     constructor() {
@@ -12,6 +13,7 @@ export default class GeoMap {
         this.controls = null; // 控制器
         this.mapGroup = []; // 组
         this.meshList = []; // 接受鼠标事件对象
+        this.selectObject = null; // 当前选中对象
     }
 
     /**
@@ -26,6 +28,7 @@ export default class GeoMap {
         this.setAxes();
         this.animat();
         this.bindMouseEvent();
+        this.makeGround();
     }
 
     /**
@@ -35,6 +38,7 @@ export default class GeoMap {
     animat() {
         requestAnimationFrame(this.animat.bind(this));
         this.controls.update();
+        TWEEN.update();
         this.renderer.render(this.scene, this.camera);
     }
 
@@ -103,6 +107,7 @@ export default class GeoMap {
         const lineMaterial = new THREE.LineBasicMaterial({color: 0x267DFF});
         data.forEach(function (areaData) {
             const areaGroup = new THREE.Group();
+            areaGroup._groupType = 'areaBlock';
             areaData.mercator.forEach(function (areaItem) {
                 // Draw area block
                 const shape = new THREE.Shape(areaItem);
@@ -157,7 +162,7 @@ export default class GeoMap {
         this.camera.position.set(x, y, z);
         this.camera.lookAt(0, 0, 0);
         this.scene.add(this.camera);
-        var light = new THREE.PointLight(0xffffff, 0.8);
+        let light = new THREE.PointLight(0xffffff, 0.8);
         this.camera.add(light);
     }
 
@@ -176,7 +181,8 @@ export default class GeoMap {
         this.renderer = new THREE.WebGLRenderer({antialias: true});
         this.renderer.setPixelRatio(window.devicePixelRatio);
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(this.renderer.domElement);
+        this.renderer.setClearColor(0x15194E);
+        document.getElementsByClassName('map')[0].appendChild(this.renderer.domElement);
 
         function onWindowResize() {
             this.camera.aspect = window.innerWidth / window.innerHeight;
@@ -223,11 +229,69 @@ export default class GeoMap {
             //返回射线选中的对象
             let intersects = raycaster.intersectObjects(that.meshList);
             if (intersects.length) {
-                console.log(intersects[0]);
-                intersects[0].object.position.z += 1
+                if (intersects[0].object.parent && intersects[0].object.parent._groupType === 'areaBlock') {
+                    if (that.selectObject !== intersects[0].object.parent) {
+                        if (that.selectObject) {
+                            transiform(that.selectObject.position, {
+                                x: that.selectObject.position.x,
+                                y: that.selectObject.position.y,
+                                z: 0
+                            }, 100);
+                            that.selectObject = intersects[0].object.parent;
+                            transiform(that.selectObject.position, {
+                                x: that.selectObject.position.x,
+                                y: that.selectObject.position.y,
+                                z: 1
+                            }, 100);
+                        } else {
+                            that.selectObject = intersects[0].object.parent;
+                            transiform(that.selectObject.position, {
+                                x: that.selectObject.position.x,
+                                y: that.selectObject.position.y,
+                                z: 1
+                            }, 100);
+                        }
+                    }
+                }
             }
         }
 
+        function transiform(o, n, t) {
+            let e = new TWEEN.Tween(o)
+                .to(n, t)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .start();
+        }
+
         window.addEventListener('mousemove', onMouseMove, false);
+    }
+
+
+    /**
+     * @desc 创建地面函数
+     * */
+    makeGround() {
+        return
+        let maps = new THREE.TextureLoader().load('../assets/images/bgf.png');
+        maps.wrapS = maps.wrapT = THREE.RepeatWrapping;
+        maps.repeat.set(10, 10); // 纹理 y,x方向重铺16次
+        maps.needsUpdate = false; // 纹理更新
+        let material = new THREE.MeshPhongMaterial({
+            // map: maps,
+            opacity: 1,
+            transparent: true,
+            emissive: 0x000000,
+            specular: 0x2f,
+            shininess: 1,
+            color: 0x41C9DC
+        });
+        let ground = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), material);
+        // ground.rotation.x = 0;
+        ground.position.x = 0;
+        ground.position.y = 0;
+        ground.position.z = 2;
+        this.scene.add(ground);
+        ground.receiveShadow = true;
+        ground.castShadow = true;
     }
 }
