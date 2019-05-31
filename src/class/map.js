@@ -23,6 +23,7 @@ export default class GeoMap {
     init() {
         this.setScene();
         this.setCamera(this.cameraPosition);
+        this.getLight();
         this.setRenderer();
         this.setControl();
         this.setAxes();
@@ -48,12 +49,26 @@ export default class GeoMap {
 
     getMap() {
         const that = this;
-        axios.get('/geojson/51.json').then(function (res) {
+        axios.get('/geojson/51.min.json').then(function (res) {
             if (res.status === 200) {
                 const data = res.data;
                 that.setMapData(data)
             }
         })
+    }
+
+    /**
+     * @desc 添加基础灯光
+     * */
+
+    getLight() {
+        const pointLight = new THREE.PointLight(0xffffff, 1, 0);
+        pointLight.position.set(0, 0, 5);
+        this.scene.add(pointLight);
+
+        const sphereSize = 1;
+        const pointLightHelper = new THREE.PointLightHelper(pointLight, sphereSize);
+        this.scene.add(pointLightHelper);
     }
 
     /**
@@ -66,6 +81,7 @@ export default class GeoMap {
         let vector3json = [];
         data.features.forEach(function (features, featuresIndex) {
             const areaItems = features.geometry.coordinates;
+            features.properties.cp = that.lnglatToVector3(features.properties.cp);
             vector3json[featuresIndex] = {
                 data: features.properties,
                 mercator: []
@@ -73,8 +89,8 @@ export default class GeoMap {
             areaItems.forEach(function (item, areaIndex) {
                 vector3json[featuresIndex].mercator[areaIndex] = [];
                 item.forEach(function (cp, cpIndex) {
-                    let lnglat = that.lnglatToVector3(cp);
-                    let vector3 = new THREE.Vector3(lnglat[0], lnglat[1], lnglat[2]).multiplyScalar(1);
+                    const lnglat = that.lnglatToVector3(cp);
+                    const vector3 = new THREE.Vector3(lnglat[0], lnglat[1], lnglat[2]).multiplyScalar(1.2);
                     vector3json[featuresIndex].mercator[areaIndex].push(vector3)
                 })
             })
@@ -92,39 +108,71 @@ export default class GeoMap {
         this.mapGroup.position.y = 0;
         this.scene.add(that.mapGroup);
         const extrudeSettings = {
-            depth: 0.4,
+            depth: 0.5,
+            steps: 1,
+            bevelSegments: 0,
+            curveSegments: 1,
             bevelEnabled: false,
         };
         const blockMaterial = new THREE.MeshPhongMaterial({
-            color: 0x2194ce,
-            emissive: 0x072534,
-            specular: 0x555555,
-            shininess: 2,
-            opacity: .6,
+            color: 0x4d00ff,
+            shininess: 0,
+            opacity: .9,
             transparent: true,
-            flatShading: true
+            wireframe: false
         });
-        const lineMaterial = new THREE.LineBasicMaterial({color: 0x267DFF});
+        const lineMaterial = new THREE.LineBasicMaterial({
+            color: 0x9800ff
+        });
         data.forEach(function (areaData) {
-            const areaGroup = new THREE.Group();
+            let areaGroup = new THREE.Group();
             areaGroup._groupType = 'areaBlock';
             areaData.mercator.forEach(function (areaItem) {
                 // Draw area block
-                const shape = new THREE.Shape(areaItem);
-                const geometry = new THREE.ExtrudeBufferGeometry(shape, extrudeSettings);
-                const mesh = new THREE.Mesh(geometry, blockMaterial);
+                let shape = new THREE.Shape(areaItem);
+                let geometry = new THREE.ExtrudeBufferGeometry(shape, extrudeSettings);
+                let mesh = new THREE.Mesh(geometry, blockMaterial);
                 areaGroup.add(mesh);
                 // Draw Line
-                const lineGeometry = new THREE.Geometry();
+                let lineGeometry = new THREE.Geometry();
                 lineGeometry.vertices = areaItem;
-                const lineMesh = new THREE.Line(lineGeometry, lineMaterial);
-                const lineMeshCp = lineMesh.clone();
-                lineMeshCp.position.z = 0.4;
+                let lineMesh = new THREE.Line(lineGeometry, lineMaterial);
+                let lineMeshCp = lineMesh.clone();
+                lineMeshCp.position.z = 0.5;
                 areaGroup.add(lineMesh);
                 areaGroup.add(lineMeshCp);
                 // add mesh to meshList for mouseEvent
                 that.meshList.push(mesh);
             });
+            /*光柱*/
+            const lightMapTexture = new THREE.TextureLoader().load('/images/light.png');
+
+            lightMapTexture.repeat.set(1, 1); // 纹理 y,x方向重铺
+            lightMapTexture.needsUpdate = false; // 纹理更新
+            let lightTipGroup = new THREE.Group();
+            let lightGeometry = new THREE.PlaneBufferGeometry(2, 0.5, 1);
+            let lightMaterial = new THREE.MeshPhongMaterial({
+                map: lightMapTexture,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 1
+            });
+            let lightPlane = new THREE.Mesh(lightGeometry, lightMaterial);
+            lightPlane.rotation.y = Math.PI / 2;
+            lightPlane.position.x = 0;
+            lightPlane.position.y = 0;
+            lightPlane.position.z = 0;
+            lightTipGroup.add(lightPlane);
+            let lightMeshCp = lightPlane.clone();
+            lightMeshCp.rotation.x = Math.PI / 2;
+            lightMeshCp.rotation.y = 0;
+            lightMeshCp.rotation.z = -Math.PI / 2;
+            lightTipGroup.add(lightMeshCp);
+            lightTipGroup.position.x = areaData.data.cp[0];
+            lightTipGroup.position.y = areaData.data.cp[1];
+            lightTipGroup.position.z = 1;
+            areaGroup.add(lightTipGroup);
+            /*光柱*/
             that.mapGroup.add(areaGroup);
         });
         that.scene.add(that.mapGroup);
@@ -162,8 +210,6 @@ export default class GeoMap {
         this.camera.position.set(x, y, z);
         this.camera.lookAt(0, 0, 0);
         this.scene.add(this.camera);
-        let light = new THREE.PointLight(0xffffff, 0.8);
-        this.camera.add(light);
     }
 
     /**
@@ -181,7 +227,6 @@ export default class GeoMap {
         this.renderer = new THREE.WebGLRenderer({antialias: true});
         this.renderer.setPixelRatio(window.devicePixelRatio);
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setClearColor(0x15194E);
         document.getElementsByClassName('map')[0].appendChild(this.renderer.domElement);
 
         function onWindowResize() {
@@ -237,19 +282,19 @@ export default class GeoMap {
                                 y: that.selectObject.position.y,
                                 z: 0
                             }, 100);
-                            that.selectObject = intersects[0].object.parent;
-                            transiform(that.selectObject.position, {
-                                x: that.selectObject.position.x,
-                                y: that.selectObject.position.y,
-                                z: 1
+                            transiform(intersects[0].object.parent.position, {
+                                x: intersects[0].object.parent.position.x,
+                                y: intersects[0].object.parent.position.y,
+                                z: 0.8
                             }, 100);
+                            that.selectObject = intersects[0].object.parent;
                         } else {
-                            that.selectObject = intersects[0].object.parent;
-                            transiform(that.selectObject.position, {
-                                x: that.selectObject.position.x,
-                                y: that.selectObject.position.y,
-                                z: 1
+                            transiform(intersects[0].object.parent.position, {
+                                x: intersects[0].object.parent.position.x,
+                                y: intersects[0].object.parent.position.y,
+                                z: 0.8
                             }, 100);
+                            that.selectObject = intersects[0].object.parent;
                         }
                     }
                 }
@@ -259,37 +304,32 @@ export default class GeoMap {
         function transiform(o, n, t) {
             let e = new TWEEN.Tween(o)
                 .to(n, t)
-                .easing(TWEEN.Easing.Quadratic.Out)
                 .start();
         }
 
         window.addEventListener('mousemove', onMouseMove, false);
     }
 
-
     /**
      * @desc 创建地面函数
      * */
     makeGround() {
-        return
-        let maps = new THREE.TextureLoader().load('../assets/images/bgf.png');
+        const maps = new THREE.TextureLoader().load('/images/bgf.png');
         maps.wrapS = maps.wrapT = THREE.RepeatWrapping;
-        maps.repeat.set(10, 10); // 纹理 y,x方向重铺16次
+        maps.repeat.set(90, 90); // 纹理 y,x方向重铺
         maps.needsUpdate = false; // 纹理更新
-        let material = new THREE.MeshPhongMaterial({
-            // map: maps,
+        let material = new THREE.MeshBasicMaterial({
+            map: maps,
             opacity: 1,
-            transparent: true,
-            emissive: 0x000000,
-            specular: 0x2f,
-            shininess: 1,
+            transparent: false,
             color: 0x41C9DC
         });
-        let ground = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), material);
+        const geometry = new THREE.PlaneGeometry(100, 100, 1, 1)
+        let ground = new THREE.Mesh(geometry, material);
         // ground.rotation.x = 0;
         ground.position.x = 0;
         ground.position.y = 0;
-        ground.position.z = 2;
+        ground.position.z = -1;
         this.scene.add(ground);
         ground.receiveShadow = true;
         ground.castShadow = true;
