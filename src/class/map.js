@@ -95,14 +95,14 @@ export default class GeoMap {
                 })
             })
         });
-        this.drewMap(vector3json)
+        this.drawMap(vector3json)
     }
 
     /**
      * @desc 绘制图形
      * @param data : Geojson
      * */
-    drewMap(data) {
+    drawMap(data) {
         let that = this;
         this.mapGroup = new THREE.Group();
         this.mapGroup.position.y = 0;
@@ -146,16 +146,17 @@ export default class GeoMap {
             });
             /*光柱*/
             const lightMapTexture = new THREE.TextureLoader().load('/images/light.png');
-
             lightMapTexture.repeat.set(1, 1); // 纹理 y,x方向重铺
             lightMapTexture.needsUpdate = false; // 纹理更新
             let lightTipGroup = new THREE.Group();
             let lightGeometry = new THREE.PlaneBufferGeometry(2, 0.5, 1);
-            let lightMaterial = new THREE.MeshPhongMaterial({
+            let lightMaterial = new THREE.MeshBasicMaterial({
                 map: lightMapTexture,
                 side: THREE.DoubleSide,
+                blending: THREE.AdditiveBlending,
+                depthTest: false,
                 transparent: true,
-                opacity: 1
+                opacity: 0.5
             });
             let lightPlane = new THREE.Mesh(lightGeometry, lightMaterial);
             lightPlane.rotation.y = Math.PI / 2;
@@ -163,14 +164,30 @@ export default class GeoMap {
             lightPlane.position.y = 0;
             lightPlane.position.z = 0;
             lightTipGroup.add(lightPlane);
+
             let lightMeshCp = lightPlane.clone();
             lightMeshCp.rotation.x = Math.PI / 2;
             lightMeshCp.rotation.y = 0;
             lightMeshCp.rotation.z = -Math.PI / 2;
             lightTipGroup.add(lightMeshCp);
+
+            let circleGeometry = new THREE.CircleBufferGeometry(0.2, 10);
+            let circleMaterial = new THREE.MeshBasicMaterial({
+                side: THREE.DoubleSide,
+                blending: THREE.AdditiveBlending,
+                color: 0xffffff,
+                depthTest: false,
+                transparent: true
+            });
+            let circleMesh = new THREE.Mesh(circleGeometry, circleMaterial);
+            circleMesh.position.z = -0.9;
+            lightTipGroup.add(circleMesh);
+
             lightTipGroup.position.x = areaData.data.cp[0];
             lightTipGroup.position.y = areaData.data.cp[1];
-            lightTipGroup.position.z = 1;
+            lightTipGroup.position.z = 1.5;
+            lightTipGroup.rotation.z = Math.PI / 4;
+
             areaGroup.add(lightTipGroup);
             /*光柱*/
             that.mapGroup.add(areaGroup);
@@ -226,6 +243,7 @@ export default class GeoMap {
     setRenderer() {
         this.renderer = new THREE.WebGLRenderer({antialias: true});
         this.renderer.setPixelRatio(window.devicePixelRatio);
+        // this.renderer.sortObjects = false; // 渲染顺序
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         document.getElementsByClassName('map')[0].appendChild(this.renderer.domElement);
 
@@ -320,7 +338,7 @@ export default class GeoMap {
         maps.needsUpdate = false; // 纹理更新
         let material = new THREE.MeshBasicMaterial({
             map: maps,
-            opacity: 1,
+            opacity: 0.7,
             transparent: false,
             color: 0x41C9DC
         });
