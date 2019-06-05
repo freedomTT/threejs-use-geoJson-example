@@ -14,6 +14,7 @@ export default class GeoMap {
         this.mapGroup = []; // 组
         this.meshList = []; // 接受鼠标事件对象
         this.selectObject = null; // 当前选中对象
+        this.loopIndex = 0; // 循环标记
     }
 
     /**
@@ -22,14 +23,15 @@ export default class GeoMap {
 
     init() {
         this.setScene();
-        this.setCamera(this.cameraPosition);
-        this.getLight();
+        this.setCamera();
+        this.setLight();
         this.setRenderer();
         this.setControl();
         this.setAxes();
+        this.makeGround();
+        this.getMap();
         this.animat();
         this.bindMouseEvent();
-        this.makeGround();
     }
 
     /**
@@ -40,6 +42,7 @@ export default class GeoMap {
         requestAnimationFrame(this.animat.bind(this));
         this.controls.update();
         TWEEN.update();
+        this.lightWave();
         this.renderer.render(this.scene, this.camera);
     }
 
@@ -61,7 +64,7 @@ export default class GeoMap {
      * @desc 添加基础灯光
      * */
 
-    getLight() {
+    setLight() {
         const pointLight = new THREE.PointLight(0xffffff, 1, 0);
         pointLight.position.set(0, 0, 5);
         this.scene.add(pointLight);
@@ -126,6 +129,7 @@ export default class GeoMap {
         });
         data.forEach(function (areaData) {
             let areaGroup = new THREE.Group();
+            areaGroup.name = 'area';
             areaGroup._groupType = 'areaBlock';
             areaData.mercator.forEach(function (areaItem) {
                 // Draw area block
@@ -144,55 +148,26 @@ export default class GeoMap {
                 // add mesh to meshList for mouseEvent
                 that.meshList.push(mesh);
             });
-            /*光柱*/
-            const lightMapTexture = new THREE.TextureLoader().load('/images/light.png');
-            lightMapTexture.repeat.set(1, 1); // 纹理 y,x方向重铺
-            lightMapTexture.needsUpdate = false; // 纹理更新
-            let lightTipGroup = new THREE.Group();
-            let lightGeometry = new THREE.PlaneBufferGeometry(2, 0.5, 1);
-            let lightMaterial = new THREE.MeshBasicMaterial({
-                map: lightMapTexture,
-                side: THREE.DoubleSide,
-                blending: THREE.AdditiveBlending,
-                depthTest: false,
-                transparent: true,
-                opacity: 0.5
-            });
-            let lightPlane = new THREE.Mesh(lightGeometry, lightMaterial);
-            lightPlane.rotation.y = Math.PI / 2;
-            lightPlane.position.x = 0;
-            lightPlane.position.y = 0;
-            lightPlane.position.z = 0;
-            lightTipGroup.add(lightPlane);
 
-            let lightMeshCp = lightPlane.clone();
-            lightMeshCp.rotation.x = Math.PI / 2;
-            lightMeshCp.rotation.y = 0;
-            lightMeshCp.rotation.z = -Math.PI / 2;
-            lightTipGroup.add(lightMeshCp);
-
-            let circleGeometry = new THREE.CircleBufferGeometry(0.2, 10);
-            let circleMaterial = new THREE.MeshBasicMaterial({
-                side: THREE.DoubleSide,
-                blending: THREE.AdditiveBlending,
-                color: 0xffffff,
-                depthTest: false,
-                transparent: true
-            });
-            let circleMesh = new THREE.Mesh(circleGeometry, circleMaterial);
-            circleMesh.position.z = -0.9;
-            lightTipGroup.add(circleMesh);
-
-            lightTipGroup.position.x = areaData.data.cp[0];
-            lightTipGroup.position.y = areaData.data.cp[1];
-            lightTipGroup.position.z = 1.5;
-            lightTipGroup.rotation.z = Math.PI / 4;
-
-            areaGroup.add(lightTipGroup);
-            /*光柱*/
+            areaGroup.add(that.lightGroup(areaData));
             that.mapGroup.add(areaGroup);
         });
         that.scene.add(that.mapGroup);
+
+        that.camera.position.set(100, 0, 100);
+
+        let path = null;
+        path = new THREE.Path();//创建一个轨迹  ，2D路径表示。该类提供了创建2D形状的路径和轮廓的方法
+        path.moveTo(0, 0);
+        path.bezierCurveTo(20, -20, 20, 20, 0, 0);//cp1X：Float，cp1Y：Float，cp2X：Float，cp2Y：Float，x：Float，y：Float）  其中（cp1X，cp1Y）和（cp2X，cp2Y）作为控制点  x,y作为中间点
+        // path.bezierCurveTo(20, 20, 0, 20, 0, 0);//cp1X：Float，cp1Y：Float，cp2X：Float，cp2Y：Float，x：Float，y：Float）  其中（cp1X，cp1Y）和（cp2X，cp2Y）作为控制点  x,y作为中间点
+        // path.closePath();//路径闭合
+        let geometry = new THREE.BufferGeometry().setFromPoints(path.getPoints());
+        let material = new THREE.LineBasicMaterial({color: 0xff0000});
+        let line = new THREE.Line(geometry, material);
+        // line.rotation.z = Math.PI / 2;
+        line.position.z = 10;
+        that.scene.add(line);
     }
 
     /**
@@ -218,13 +193,11 @@ export default class GeoMap {
     /**
      * @desc 创建相机
      * */
-    setCamera(data) {
-        this.camera = new THREE.PerspectiveCamera(10, window.innerWidth / window.innerHeight, 1, 1000);
-        this.camera.up.x = 0
-        this.camera.up.y = 0
-        this.camera.up.z = 1
-        const {x, y, z} = data;
-        this.camera.position.set(x, y, z);
+    setCamera() {
+        this.camera = new THREE.PerspectiveCamera(10, window.innerWidth / window.innerHeight, 1, 2000);
+        this.camera.up.x = 0;
+        this.camera.up.y = 0;
+        this.camera.up.z = 1;
         this.camera.lookAt(0, 0, 0);
         this.scene.add(this.camera);
     }
@@ -243,7 +216,7 @@ export default class GeoMap {
     setRenderer() {
         this.renderer = new THREE.WebGLRenderer({antialias: true});
         this.renderer.setPixelRatio(window.devicePixelRatio);
-        // this.renderer.sortObjects = false; // 渲染顺序
+        this.renderer.sortObjects = true; // 渲染顺序
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         document.getElementsByClassName('map')[0].appendChild(this.renderer.domElement);
 
@@ -351,5 +324,109 @@ export default class GeoMap {
         this.scene.add(ground);
         ground.receiveShadow = true;
         ground.castShadow = true;
+    }
+
+    /**
+     * @desc 光柱
+     * */
+
+    lightGroup(areaData) {
+        /*光柱*/
+        const lightMapTexture = new THREE.TextureLoader().load('/images/light.png');
+        lightMapTexture.repeat.set(1, 1); // 纹理 y,x方向重铺
+        lightMapTexture.needsUpdate = false; // 纹理更新
+        let lightTipGroup = new THREE.Group();
+        lightTipGroup.name = 'lightTipGroup'
+        let lightGeometry = new THREE.PlaneBufferGeometry(2, 0.5, 1);
+        let lightMaterial = new THREE.MeshBasicMaterial({
+            map: lightMapTexture,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending,
+            depthTest: false,
+            transparent: true,
+            opacity: 0.5
+        });
+        let lightPlane = new THREE.Mesh(lightGeometry, lightMaterial);
+        lightPlane.rotation.y = Math.PI / 2;
+        lightPlane.position.x = 0;
+        lightPlane.position.y = 0;
+        lightPlane.position.z = 0;
+        lightTipGroup.add(lightPlane);
+
+        let lightMeshCp = lightPlane.clone();
+        lightMeshCp.rotation.x = Math.PI / 2;
+        lightMeshCp.rotation.y = 0;
+        lightMeshCp.rotation.z = -Math.PI / 2;
+        lightTipGroup.add(lightMeshCp);
+
+        let circleGeometry = new THREE.CircleBufferGeometry(0.2, 20);
+        let circleMaterial = new THREE.MeshBasicMaterial({
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending,
+            color: '#ff007e',
+            depthTest: false,
+            transparent: true,
+            opacity: 1
+        });
+        let circleMesh = new THREE.Mesh(circleGeometry, circleMaterial);
+        circleMesh.position.z = -0.99;
+
+        circleMesh.renderOrder = 1;
+        lightTipGroup.add(circleMesh);
+
+        let circleCpGeometry = new THREE.CircleBufferGeometry(0.2, 20);
+        let circleCpMaterial = new THREE.MeshBasicMaterial({
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending,
+            color: 0xffffff,
+            depthTest: false,
+            transparent: true,
+            opacity: 1
+        });
+        let circleMeshCp = new THREE.Mesh(circleCpGeometry, circleCpMaterial);
+        circleMeshCp.name = 'circleMesh';
+        circleMeshCp.position.z = -0.995;
+        lightTipGroup.add(circleMeshCp);
+
+        lightTipGroup.position.x = areaData.data.cp[0];
+        lightTipGroup.position.y = areaData.data.cp[1];
+        lightTipGroup.position.z = 1.5;
+        lightTipGroup.rotation.z = Math.PI / 4;
+        lightTipGroup.renderOrder = 2;
+
+        return lightTipGroup
+    }
+
+    /**
+     * @desc 光柱波纹动画
+     * */
+
+    lightWave() {
+        if (this.mapGroup.children) {
+            let that = this;
+            if (this.loopIndex >= 1) {
+                this.loopIndex = 0;
+            } else {
+                this.loopIndex += 0.02;
+            }
+            this.mapGroup.children.forEach(function (item) {
+                if (item.name === 'area') {
+                    item.children.forEach(function (g) {
+                        if (g.name === 'lightTipGroup') {
+                            g.children.forEach(function (c) {
+                                if (c.name === 'circleMesh') {
+                                    c.scale = {
+                                        x: 4 * Math.asin(that.loopIndex) + 1,
+                                        y: 4 * Math.asin(that.loopIndex) + 1,
+                                        z: 4 * Math.asin(that.loopIndex) + 1
+                                    };
+                                    c.material.opacity = 0.3 * Math.acos(that.loopIndex) - 0.1
+                                }
+                            })
+                        }
+                    })
+                }
+            })
+        }
     }
 }

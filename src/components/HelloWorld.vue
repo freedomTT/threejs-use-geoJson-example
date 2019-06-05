@@ -15,7 +15,6 @@
         mounted() {
             this.geoMap = new GeoMap();
             this.geoMap.init();
-            this.geoMap.getMap();
         }
     }
 </script>
