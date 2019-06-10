@@ -15,6 +15,7 @@ export default class GeoMap {
         this.meshList = []; // 接受鼠标事件对象
         this.selectObject = null; // 当前选中对象
         this.loopIndex = 0; // 循环标记
+        this.cameraPath = null; // 相机运动轨迹
     }
 
     /**
@@ -40,9 +41,10 @@ export default class GeoMap {
 
     animat() {
         requestAnimationFrame(this.animat.bind(this));
-        this.controls.update();
-        TWEEN.update();
         this.lightWave();
+        //this.moveCamera();
+        TWEEN.update();
+        this.controls.update();
         this.renderer.render(this.scene, this.camera);
     }
 
@@ -117,15 +119,14 @@ export default class GeoMap {
             curveSegments: 1,
             bevelEnabled: false,
         };
-        const blockMaterial = new THREE.MeshPhongMaterial({
-            color: 0x4d00ff,
-            shininess: 0,
-            opacity: .9,
+        const blockMaterial = new THREE.MeshBasicMaterial({
+            color: '#3700b1',
+            opacity: 0.7,
             transparent: true,
             wireframe: false
         });
         const lineMaterial = new THREE.LineBasicMaterial({
-            color: 0x9800ff
+            color: '#9800ff'
         });
         data.forEach(function (areaData) {
             let areaGroup = new THREE.Group();
@@ -155,19 +156,32 @@ export default class GeoMap {
         that.scene.add(that.mapGroup);
 
         that.camera.position.set(100, 0, 100);
+    }
 
-        let path = null;
-        path = new THREE.Path();//创建一个轨迹  ，2D路径表示。该类提供了创建2D形状的路径和轮廓的方法
-        path.moveTo(0, 0);
-        path.bezierCurveTo(20, -20, 20, 20, 0, 0);//cp1X：Float，cp1Y：Float，cp2X：Float，cp2Y：Float，x：Float，y：Float）  其中（cp1X，cp1Y）和（cp2X，cp2Y）作为控制点  x,y作为中间点
-        // path.bezierCurveTo(20, 20, 0, 20, 0, 0);//cp1X：Float，cp1Y：Float，cp2X：Float，cp2Y：Float，x：Float，y：Float）  其中（cp1X，cp1Y）和（cp2X，cp2Y）作为控制点  x,y作为中间点
-        // path.closePath();//路径闭合
-        let geometry = new THREE.BufferGeometry().setFromPoints(path.getPoints());
-        let material = new THREE.LineBasicMaterial({color: 0xff0000});
-        let line = new THREE.Line(geometry, material);
-        // line.rotation.z = Math.PI / 2;
-        line.position.z = 10;
-        that.scene.add(line);
+    /**
+     * @desc 移动相机
+     * */
+    moveCamera() {
+        // 第一次绘制相机路径
+        if (this.cameraPath === null) {
+            this.cameraPath = new THREE.Path();
+            this.cameraPath.moveTo(150, 0);
+            this.cameraPath.lineTo(70, 0);
+            let geometry = new THREE.BufferGeometry().setFromPoints(this.cameraPath.getPoints());
+            let material = new THREE.LineBasicMaterial({color: 0xff0000});
+            let line = new THREE.Line(geometry, material);
+            line.position.z = 100;
+            this.scene.add(line);
+            this.progress = 0;
+        } else {
+            if (this.progress < 1) {
+                this.progress += 0.01; // 增量 也就是说将该线端，按照1/500的比例进行分割。也就是说有500个坐标点
+                let point = this.cameraPath.getPointAt(this.progress); // 从路径中拿取坐标点点
+                if (point) {
+                    this.camera.position.set(point.x, point.y, 100);
+                }
+            }
+        }
     }
 
     /**
@@ -215,7 +229,7 @@ export default class GeoMap {
      * */
     setRenderer() {
         this.renderer = new THREE.WebGLRenderer({antialias: true});
-        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.setPixelRatio(window.devicePixelRatio * 0.6);
         this.renderer.sortObjects = true; // 渲染顺序
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         document.getElementsByClassName('map')[0].appendChild(this.renderer.domElement);
@@ -307,13 +321,13 @@ export default class GeoMap {
     makeGround() {
         const maps = new THREE.TextureLoader().load('/images/bgf.png');
         maps.wrapS = maps.wrapT = THREE.RepeatWrapping;
-        maps.repeat.set(90, 90); // 纹理 y,x方向重铺
-        maps.needsUpdate = false; // 纹理更新
+        maps.repeat.set(14, 14); // 纹理 y,x方向重铺
+        maps.needsUpdate = true; // 纹理更新
         let material = new THREE.MeshBasicMaterial({
             map: maps,
-            opacity: 0.7,
-            transparent: false,
-            color: 0x41C9DC
+            opacity: 1,
+            transparent: true,
+            color: '#3b49ff'
         });
         const geometry = new THREE.PlaneGeometry(100, 100, 1, 1)
         let ground = new THREE.Mesh(geometry, material);
