@@ -30,7 +30,8 @@ export default class GeoMap {
         this.setControl();
         this.setAxes();
         this.makeGround();
-        this.getMap();
+        this.getMap('/geojson/china.json', 'china');
+        this.getMap('/geojson/51.min.json', 'sichuan');
         this.animat();
         this.bindMouseEvent();
     }
@@ -52,12 +53,12 @@ export default class GeoMap {
      * @desc 获取地图
      * */
 
-    getMap() {
+    getMap(url, type) {
         const that = this;
-        axios.get('/geojson/51.min.json').then(function (res) {
+        axios.get(url).then(function (res) {
             if (res.status === 200) {
                 const data = res.data;
-                that.setMapData(data)
+                that.setMapData(data, type)
             }
         })
     }
@@ -81,7 +82,7 @@ export default class GeoMap {
      * @params geojson
      * */
 
-    setMapData(data) {
+    setMapData(data, type) {
         const that = this;
         let vector3json = [];
         data.features.forEach(function (features, featuresIndex) {
@@ -93,14 +94,18 @@ export default class GeoMap {
             };
             areaItems.forEach(function (item, areaIndex) {
                 vector3json[featuresIndex].mercator[areaIndex] = [];
-                item.forEach(function (cp, cpIndex) {
+                item.forEach(function (cp) {
                     const lnglat = that.lnglatToVector3(cp);
                     const vector3 = new THREE.Vector3(lnglat[0], lnglat[1], lnglat[2]).multiplyScalar(1.2);
                     vector3json[featuresIndex].mercator[areaIndex].push(vector3)
                 })
             })
         });
-        this.drawMap(vector3json)
+        if (type === 'sichuan') {
+            this.drawMap(vector3json)
+        } else if (type === 'china') {
+            this.drawChinaMap(vector3json)
+        }
     }
 
     /**
@@ -113,7 +118,7 @@ export default class GeoMap {
         this.mapGroup.position.y = 0;
         this.scene.add(that.mapGroup);
         const extrudeSettings = {
-            depth: 0.5,
+            depth: 0.8,
             steps: 1,
             bevelSegments: 0,
             curveSegments: 1,
@@ -143,19 +148,64 @@ export default class GeoMap {
                 lineGeometry.vertices = areaItem;
                 let lineMesh = new THREE.Line(lineGeometry, lineMaterial);
                 let lineMeshCp = lineMesh.clone();
-                lineMeshCp.position.z = 0.5;
+                lineMeshCp.position.z = 0.8;
                 areaGroup.add(lineMesh);
                 areaGroup.add(lineMeshCp);
                 // add mesh to meshList for mouseEvent
                 that.meshList.push(mesh);
             });
-
             areaGroup.add(that.lightGroup(areaData));
             that.mapGroup.add(areaGroup);
         });
         that.scene.add(that.mapGroup);
+    }
 
-        that.camera.position.set(100, 0, 100);
+    /**
+     * @desc 绘制图形作为背景
+     * @param data : Geojson
+     * */
+    drawChinaMap(data) {
+        let that = this;
+        let mapGroup = new THREE.Group();
+        mapGroup.position.y = 0;
+        this.scene.add(mapGroup);
+        const lineMaterial = new THREE.LineBasicMaterial({
+            color: '#4e4e4e'
+        });
+        const blockMaterial = new THREE.MeshBasicMaterial({
+            color: '#b10020',
+            opacity: 0.7,
+            transparent: true,
+            wireframe: false,
+            side: THREE.DoubleSide
+        });
+        data.forEach(function (areaData) {
+            if (areaData.data.id === '51') {
+                areaData.mercator.forEach(function (areaItem) {
+                    let geometry = new THREE.Geometry();
+                    areaItem.forEach(function (point) {
+                        geometry.vertices.push(
+                            new THREE.Vector3(point.x, point.y, point.z),
+                            new THREE.Vector3(point.x, point.y, point.z + 2)
+                        );
+                    });
+                    for (let i = 0; i < geometry.vertices.length - 2; i++) {
+                        geometry.faces.push(new THREE.Face3(i, i + 1, i + 2));
+                    }
+                    let mesh = new THREE.Mesh(geometry, blockMaterial);
+                    mapGroup.add(mesh);
+                });
+            } else {
+                areaData.mercator.forEach(function (areaItem) {
+                    // Draw Line
+                    let lineGeometry = new THREE.Geometry();
+                    lineGeometry.vertices = areaItem;
+                    let lineMesh = new THREE.Line(lineGeometry, lineMaterial);
+                    mapGroup.add(lineMesh);
+                });
+            }
+        });
+        that.scene.add(mapGroup);
     }
 
     /**
@@ -229,7 +279,7 @@ export default class GeoMap {
      * */
     setRenderer() {
         this.renderer = new THREE.WebGLRenderer({antialias: true});
-        this.renderer.setPixelRatio(window.devicePixelRatio * 0.6);
+        this.renderer.setPixelRatio(window.devicePixelRatio * 1);
         this.renderer.sortObjects = true; // 渲染顺序
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         document.getElementsByClassName('map')[0].appendChild(this.renderer.domElement);
