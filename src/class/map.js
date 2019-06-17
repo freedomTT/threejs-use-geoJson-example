@@ -130,6 +130,12 @@ export default class GeoMap {
             transparent: true,
             wireframe: false
         });
+        const blockSideMaterial = new THREE.MeshBasicMaterial({
+            color: '#5923bc',
+            opacity: 0.7,
+            transparent: true,
+            wireframe: false
+        });
         const lineMaterial = new THREE.LineBasicMaterial({
             color: '#9800ff'
         });
@@ -141,7 +147,7 @@ export default class GeoMap {
                 // Draw area block
                 let shape = new THREE.Shape(areaItem);
                 let geometry = new THREE.ExtrudeBufferGeometry(shape, extrudeSettings);
-                let mesh = new THREE.Mesh(geometry, blockMaterial);
+                let mesh = new THREE.Mesh(geometry, [blockMaterial, blockSideMaterial]);
                 areaGroup.add(mesh);
                 // Draw Line
                 let lineGeometry = new THREE.Geometry();
@@ -169,38 +175,57 @@ export default class GeoMap {
         let mapGroup = new THREE.Group();
         mapGroup.position.y = 0;
         this.scene.add(mapGroup);
-        const lineMaterial = new THREE.LineBasicMaterial({
-            color: '#4e4e4e'
+        const lineMaterial = new THREE.LineDashedMaterial({
+            color: '#656565',
+            dashSize: 0.1,
+            gapSize: 0.2
         });
-        const blockMaterial = new THREE.MeshBasicMaterial({
-            color: '#b10020',
-            opacity: 0.7,
+        let fakeLightMaterial = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            flatShading: true,
+            vertexColors: THREE.VertexColors,
+            side: THREE.DoubleSide,
             transparent: true,
+            opacity: 0.5,
+            depthTest: false,
             wireframe: false,
-            side: THREE.DoubleSide
         });
         data.forEach(function (areaData) {
             if (areaData.data.id === '51') {
                 areaData.mercator.forEach(function (areaItem) {
-                    let geometry = new THREE.Geometry();
-                    areaItem.forEach(function (point) {
-                        geometry.vertices.push(
-                            new THREE.Vector3(point.x, point.y, point.z),
-                            new THREE.Vector3(point.x, point.y, point.z + 2)
-                        );
-                    });
-                    for (let i = 0; i < geometry.vertices.length - 2; i++) {
-                        geometry.faces.push(new THREE.Face3(i, i + 1, i + 2));
+                    let geometry = new THREE.BufferGeometry();
+                    let verticesArr = [];
+                    for (let i = 0; i < areaItem.length - 1; i++) {
+                        verticesArr.push(areaItem[i].x, areaItem[i].y, areaItem[i].z);
+                        verticesArr.push(areaItem[i + 1].x, areaItem[i + 1].y, areaItem[i + 1].z + 5);
+                        verticesArr.push(areaItem[i].x, areaItem[i].y, areaItem[i].z + 5);
+
+                        verticesArr.push(areaItem[i].x, areaItem[i].y, areaItem[i].z);
+                        verticesArr.push(areaItem[i + 1].x, areaItem[i + 1].y, areaItem[i + 1].z);
+                        verticesArr.push(areaItem[i + 1].x, areaItem[i + 1].y, areaItem[i + 1].z + 5);
                     }
-                    let mesh = new THREE.Mesh(geometry, blockMaterial);
+                    geometry.addAttribute('position', new THREE.BufferAttribute(new Float32Array(verticesArr), 3));
+                    let count = geometry.attributes.position.count;
+                    geometry.addAttribute('color', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+                    let color = new THREE.Color();
+                    let positions = geometry.attributes.position;
+                    let colors = geometry.attributes.color;
+                    for (let i = 0; i < count; i++) {
+                        let a = positions.getZ(i) ? 0 : 1;
+                        color.setHSL((268 * a) / 360, 1.0 * a, a ? 0.5 : 0.13);
+                        colors.setXYZ(i, color.r, color.g, color.b);
+                    }
+                    let mesh = new THREE.Mesh(geometry, fakeLightMaterial);
                     mapGroup.add(mesh);
                 });
+
             } else {
                 areaData.mercator.forEach(function (areaItem) {
                     // Draw Line
                     let lineGeometry = new THREE.Geometry();
                     lineGeometry.vertices = areaItem;
                     let lineMesh = new THREE.Line(lineGeometry, lineMaterial);
+                    lineMesh.computeLineDistances();
                     mapGroup.add(lineMesh);
                 });
             }
@@ -281,6 +306,7 @@ export default class GeoMap {
         this.renderer = new THREE.WebGLRenderer({antialias: true});
         this.renderer.setPixelRatio(window.devicePixelRatio * 1);
         this.renderer.sortObjects = true; // 渲染顺序
+        this.renderer.setClearColor('#212121');
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         document.getElementsByClassName('map')[0].appendChild(this.renderer.domElement);
 
@@ -372,16 +398,15 @@ export default class GeoMap {
         const maps = new THREE.TextureLoader().load('/images/bgf.png');
         maps.wrapS = maps.wrapT = THREE.RepeatWrapping;
         maps.repeat.set(14, 14); // 纹理 y,x方向重铺
-        maps.needsUpdate = true; // 纹理更新
+        maps.needsUpdate = false; // 纹理更新
         let material = new THREE.MeshBasicMaterial({
-            map: maps,
+            // map: maps,
             opacity: 1,
             transparent: true,
-            color: '#3b49ff'
+            color: '#212121'
         });
-        const geometry = new THREE.PlaneGeometry(100, 100, 1, 1)
+        const geometry = new THREE.PlaneGeometry(100, 100, 1, 1);
         let ground = new THREE.Mesh(geometry, material);
-        // ground.rotation.x = 0;
         ground.position.x = 0;
         ground.position.y = 0;
         ground.position.z = -1;
