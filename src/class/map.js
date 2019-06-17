@@ -43,7 +43,7 @@ export default class GeoMap {
     animat() {
         requestAnimationFrame(this.animat.bind(this));
         this.lightWave();
-        //this.moveCamera();
+        // this.moveCamera();
         TWEEN.update();
         this.controls.update();
         this.renderer.render(this.scene, this.camera);
@@ -161,6 +161,7 @@ export default class GeoMap {
                 that.meshList.push(mesh);
             });
             areaGroup.add(that.lightGroup(areaData));
+            areaGroup.add(that.tipsSprite(areaData));
             that.mapGroup.add(areaGroup);
         });
         that.scene.add(that.mapGroup);
@@ -484,6 +485,38 @@ export default class GeoMap {
         lightTipGroup.renderOrder = 2;
 
         return lightTipGroup
+    }
+
+    /**
+     * @desc 地区名称 采用sprite
+     * */
+
+    tipsSprite(areaData) {
+        let canvas = document.createElement("canvas");
+        canvas.width = 500;
+        canvas.height = 60;
+        document.body.appendChild(canvas);
+
+        let ctx = canvas.getContext("2d");
+
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "50px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(areaData.data.name, 250, 40);
+
+        let texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        let SpriteMaterial = new THREE.SpriteMaterial({
+            map: texture,
+            depthTest: false,
+        });
+
+        let textSprite = new THREE.Sprite(SpriteMaterial);
+        textSprite.position.set(areaData.data.cp[0], areaData.data.cp[1], 1);
+        textSprite.scale.set(4, 0.5, 1);
+        textSprite.renderOrder = 3;
+
+        return textSprite
     }
 
     /**
