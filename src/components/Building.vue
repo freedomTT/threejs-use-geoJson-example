@@ -1,22 +1,22 @@
 <template>
     <div>
-        <div class="map"></div>
+        <div class="building"></div>
     </div>
 </template>
 
 <script>
-    import GeoMap from '../class/map'
+    import Building from '../class/building'
 
     export default {
-        name: 'HelloWorld',
+        name: 'Building',
         data: function () {
             return {
-                geoMap: null
+                building: null
             }
         },
         mounted() {
-            this.geoMap = new GeoMap();
-            this.geoMap.init();
+            this.building = new Building();
+            this.building.init();
         }
     }
 </script>

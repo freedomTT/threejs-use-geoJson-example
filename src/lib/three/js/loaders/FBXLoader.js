@@ -18,7 +18,7 @@
  *		https://code.blender.org/2013/08/fbx-binary-file-format-specification/
  */
 
-
+import * as THREE from 'three'
 THREE.FBXLoader = ( function () {
 
 	var fbxTree;
