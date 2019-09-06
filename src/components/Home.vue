@@ -3,6 +3,9 @@
         home
         <ul>
             <li>
+                <router-link to="/earth">地球</router-link>
+            </li>
+            <li>
                 <router-link to="/map">地图</router-link>
             </li>
             <li>

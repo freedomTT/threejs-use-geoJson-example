@@ -3,6 +3,7 @@ import VueRouter from 'vue-router'
 import App from './App.vue'
 import Home from './components/Home.vue'
 import Map from './components/Map.vue'
+import Earth from './components/Earth.vue'
 import Building from './components/Building.vue'
 
 
@@ -12,6 +13,7 @@ Vue.use(VueRouter)
 
 const routes = [
     {path: '/', component: Home},
+    {path: '/earth', component: Earth},
     {path: '/map', component: Map},
     {path: '/building', component: Building}
 ]

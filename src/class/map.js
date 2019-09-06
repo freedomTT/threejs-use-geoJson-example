@@ -30,7 +30,7 @@ export default class GeoMap {
         this.setControl();
         this.setAxes();
         this.makeGround();
-        this.getMap('/geojson/china.json', 'china');
+        this.getMap('/geojson/world.json', 'china');
         this.getMap('/geojson/51.min.json', 'sichuan');
         this.animat();
         this.bindMouseEvent();
