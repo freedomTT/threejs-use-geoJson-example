@@ -13,7 +13,7 @@ export default class GeoMap {
         this.earthCtx = null;
         this.earthImgData = null;
         this.earthParticles = new THREE.Object3D();
-
+        this.animateDots = [];
         this.hexagon = new THREE.Object3D()
 
         this.areas = [
@@ -44,33 +44,6 @@ export default class GeoMap {
             }, {
                 name: "英国",
                 position: [-0.05, 51.36]
-            }, {
-                name: "印度尼西亚",
-                position: [106.49, -6.09]
-            }, {
-                name: "印度",
-                position: [77.13, 28.37]
-            }, {
-                name: "意大利",
-                position: [12.29, 41.54]
-            }, {
-                name: "以色列",
-                position: [35.12, 31.47]
-            }, {
-                name: "伊朗",
-                position: [51.30, 35.44]
-            }, {
-                name: "伊拉克",
-                position: [44.30, 33.20]
-            }, {
-                name: "亚美尼亚",
-                position: [44.31, 40.10]
-            }, {
-                name: "牙买加",
-                position: [-76.50, 18.00]
-            }, {
-                name: "匈牙利",
-                position: [19.05, 47.29]
             }];
 
         this.homePosition = {
@@ -99,7 +72,8 @@ export default class GeoMap {
             that.setCamera();
             that.setRenderer();
             that.setControl();
-            that.createEarthParticles();
+            that.createEarth();
+            // that.createEarthParticles();
             that.animate();
 
             setTimeout(function () {
@@ -152,7 +126,11 @@ export default class GeoMap {
      * @desc 创建渲染器
      * */
     setRenderer() {
-        this.renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+        this.renderer = new THREE.WebGLRenderer({
+            alpha: true,
+            antialias: true,
+            preserveDrawingBuffer: true
+        });
         this.renderer.setPixelRatio(window.devicePixelRatio * 1);
         this.renderer.sortObjects = true; // 渲染顺序
         this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -178,13 +156,36 @@ export default class GeoMap {
     /**
      * @desc 创建地球
      * */
+
+    createEarth() {
+        let that = this;
+        var earthGeo = new THREE.SphereGeometry(that.radius, 100, 100);
+        var earthMater = new THREE.MeshPhongMaterial({
+            map: new THREE.TextureLoader().load('/images/earth/earth3.jpg'),
+            transparent: true,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending,
+            opacity: 0.8,
+            color: 0x03d98e
+        });
+        var earthMesh = new THREE.Mesh(earthGeo, earthMater);
+        that.scene.add(earthMesh)
+        // 光
+        var light = new THREE.HemisphereLight(0xffffff, 0xffffff, 1);
+        that.scene.add(light);
+    }
+
+    /**
+     * @desc 创建地球 - 点
+     * */
     createEarthParticles() {
         let that = this;
         let positions = []
         let materials = []
         let sizes = []
         let mat = null
-        for (var i = 0; i < 2; i++) {
+        for (let i = 0; i < 2; i++) {
             positions[i] = {
                 positions: []
             }
@@ -197,7 +198,7 @@ export default class GeoMap {
             mat.map = new THREE.TextureLoader().load('/images/earth/dot.png')
             mat.depthWrite = false
             mat.transparent = true
-            mat.opacity = .8
+            mat.opacity = 1
             mat.side = THREE.FrontSide
             mat.blending = THREE.AdditiveBlending
             let n = i / 2
@@ -210,7 +211,7 @@ export default class GeoMap {
         }
         let spherical = new THREE.Spherical
         spherical.radius = that.radius // radius
-        const step = 250
+        const step = 200
         for (let i = 0; i < step; i++) {
             let vec = new THREE.Vector3
             let radians = step * (1 - Math.sin(i / step * Math.PI)) / step + .5 // 每个纬线圈内的角度均分
@@ -288,21 +289,7 @@ export default class GeoMap {
             createCone(position, index) // 光锥
 
             // 画曲线
-            let c = {
-                x: (position.x + homePostion.x) / 2,
-                y: (position.y + homePostion.y) / 2,
-                z: (position.z + homePostion.z) / 2,
-            };
-            let curve = new THREE.QuadraticBezierCurve3(
-                position,
-                new THREE.Vector3(c.x * 1.5, c.y * 1.5, c.z * 1.5),
-                homePostion
-            );
-
-            let points = curve.getPoints(50);
-            let geometry = new THREE.BufferGeometry().setFromPoints(points);
-            let material = new THREE.LineBasicMaterial({color: 0xff0000});
-            let curveObject = new THREE.Line(geometry, material);
+            let curveObject = addLines(position, homePostion);
 
             that.scene.add(curveObject)
         }
@@ -323,9 +310,8 @@ export default class GeoMap {
             return position
         }
 
-        function createHexagon(position, index) {
-            const hexagonColor = [0xffffff, 0xffff00]
-            const color = hexagonColor[index]
+        function createHexagon(position) {
+            const color = 0xffff00;
             let hexagonLine = new THREE.CircleGeometry(HEXAGON_RADIUS, 6)
             let hexagonPlane = new THREE.CircleGeometry(HEXAGON_RADIUS - CITY_MARGIN, 6)
             let vertices = hexagonLine.vertices
@@ -354,8 +340,7 @@ export default class GeoMap {
         }
 
         function createCone(position, index) {
-            let coneImg = ['/images/earth/lightray.jpg', '/images/earth/lightray_yellow.jpg']
-            let texture = new THREE.TextureLoader().load(coneImg[index]),
+            let texture = new THREE.TextureLoader().load('/images/earth/lightray_yellow.jpg'),
                 material = new THREE.MeshBasicMaterial({
                     map: texture,
                     transparent: true,
@@ -363,7 +348,7 @@ export default class GeoMap {
                     side: THREE.DoubleSide,
                     blending: THREE.AdditiveBlending
                 }),
-                height = Math.random() * 50,
+                height = Math.random() * 30,
                 geometry = new THREE.PlaneGeometry(HEXAGON_RADIUS * 2, height),
                 matrix1 = new THREE.Matrix4,
                 plane1 = new THREE.Mesh(geometry, material)
@@ -377,5 +362,84 @@ export default class GeoMap {
             plane1.lookAt(0, 0, 0)
             that.scene.add(plane1)
         }
+
+
+        // 画线
+        function addLines(v0, v3) {
+            // 夹角
+            let angle = (v0.angleTo(v3) * 180) / Math.PI / 10; // 0 ~ Math.PI
+            let aLen = angle * 10,
+                hLen = angle * angle * 120;
+            let p0 = new THREE.Vector3(0, 0, 0);
+
+            // 开始，结束点
+            // var v0 = groupDots.children[0].position;
+            // var v3 = groupDots.children[1].position;
+
+            // 法线向量
+            let rayLine = new THREE.Ray(p0, getVCenter(v0.clone(), v3.clone()));
+
+            // 顶点坐标
+            let vtop = rayLine.at(hLen / rayLine.at(1).distanceTo(p0));
+
+            // 控制点坐标
+            let v1 = getLenVcetor(v0.clone(), vtop, aLen);
+            let v2 = getLenVcetor(v3.clone(), vtop, aLen);
+
+            // 绘制贝塞尔曲线
+            let curve = new THREE.CubicBezierCurve3(v0, v1, v2, v3);
+            let geometry = new THREE.Geometry();
+            geometry.vertices = curve.getPoints(50);
+            let material = new THREE.LineBasicMaterial({
+                color: 0xff0000,
+                alphaTest: false,
+                depthTest: true,
+            });
+            // for 点动画
+            that.animateDots.push(curve.getPoints(100));
+            // Create the final object to add to the scene
+            return new THREE.Line(geometry, material)
+        }
+
+        // 计算v1,v2 的中点
+        function getVCenter(v1, v2) {
+            let v = v1.add(v2);
+            return v.divideScalar(2);
+        }
+
+        // 计算V1，V2向量固定长度的点
+        function getLenVcetor(v1, v2, len) {
+            let v1v2Len = v1.distanceTo(v2);
+            return v1.lerp(v2, len / v1v2Len);
+        }
+
+        function dotAnimate() {
+            var aGroup = new THREE.Group();
+            for (let i = 0; i < that.animateDots.length; i++) {
+                let aGeo = new THREE.SphereGeometry(2, 10, 10);
+                let aMater = new THREE.MeshPhongMaterial({color: 0xff0000});
+                let aMesh = new THREE.Mesh(aGeo, aMater);
+                aGroup.add(aMesh);
+            }
+
+            var vIndex = 0;
+
+            function animateLine() {
+                aGroup.children.forEach((elem, index) => {
+                    let v = that.animateDots[index][vIndex];
+                    elem.position.set(v.x, v.y, v.z);
+                });
+                vIndex++;
+                if (vIndex > 100) {
+                    vIndex = 0;
+                }
+                requestAnimationFrame(animateLine);
+            }
+
+            that.scene.add(aGroup);
+            animateLine();
+        }
+
+        dotAnimate();
     }
 }
